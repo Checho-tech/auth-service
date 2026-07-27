@@ -1,0 +1,27 @@
+# --- Secrets: NEVER commit real environment values ---
+.env
+.env.*
+!.env.example
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# --- OS / editor ---
+.DS_Store
+.vscode/
+.idea/
+
+# --- Docker ---
+*.pid
+
+# --- Alembic (keep migration scripts, ignore local sqlite scratch DBs if any) ---
+*.db
+*.sqlite3

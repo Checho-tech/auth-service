@@ -1,0 +1,97 @@
+[project]
+name = "auth-service"
+version = "0.1.0"
+description = "Standalone Authentication & Authorization microservice built with Clean Architecture principles."
+requires-python = ">=3.12"
+readme = "README.md"
+
+dependencies = [
+    # --- Web framework ---
+    "fastapi>=0.115,<1.0",
+    "uvicorn[standard]>=0.32,<1.0",
+
+    # --- Settings / config (Twelve-Factor: fail fast on missing env vars) ---
+    "pydantic>=2.9,<3.0",
+    "pydantic-settings>=2.6,<3.0",
+    "email-validator>=2.2,<3.0",
+
+    # --- Database (async end-to-end so FastAPI's event loop never blocks on I/O) ---
+    "sqlalchemy[asyncio]>=2.0,<3.0",
+    "asyncpg>=0.30,<1.0",
+    "alembic>=1.14,<2.0",
+
+    # --- Security ---
+    # PyJWT instead of python-jose: smaller attack surface, actively maintained,
+    # and forces explicit algorithm allow-listing on decode (prevents "alg: none" /
+    # algorithm-confusion attacks that have hit python-jose historically).
+    "pyjwt[crypto]>=2.9,<3.0",
+    # passlib 1.7.4 (its last release) predates breaking internal API changes
+    # in bcrypt>=4.1, causing a "password cannot be longer than 72 bytes"
+    # error even for short passwords (a known passlib/bcrypt incompatibility,
+    # not a real length violation). Pinning bcrypt<4.1 restores compatibility.
+    "passlib[bcrypt]>=1.7,<2.0",
+    "bcrypt<4.1",
+
+    # --- Rate limiting (brute-force protection on login/reset endpoints) ---
+    "slowapi>=0.1.9,<1.0",
+
+    # --- Structured logging ---
+    "structlog>=24.4,<25.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3,<9.0",
+    "pytest-asyncio>=0.24,<1.0",
+    "httpx>=0.27,<1.0",          # async test client for FastAPI
+    "ruff>=0.7,<1.0",            # linter + formatter (replaces flake8+black+isort)
+    "mypy>=1.13,<2.0",           # static type checking
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+# B008 flags "function call in default argument" — but Depends(...)/Query(...)
+# as a parameter default is the idiomatic, required FastAPI DI pattern, not a
+# bug (unlike the mutable-default-argument footgun the rule is meant to catch).
+ignore = ["B008"]
+
+[tool.ruff.lint.per-file-ignores]
+# Long, descriptive test names document the scenario better than an
+# abbreviation would — worth exceeding the line-length limit for.
+"tests/**" = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = "src"
+
+[[tool.mypy.overrides]]
+# passlib has no actively-maintained type stubs on PyPI.
+module = "passlib.*"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+# The app's DB engine (infrastructure/database/session.py) is a module-level
+# singleton, matching production (one event loop for the app's whole life).
+# Without this, pytest-asyncio's default per-test event loop would hand the
+# same pooled asyncpg connections to a different loop on every test and
+# crash with "attached to a different loop".
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+testpaths = ["tests"]
+# Explicit path, not reliant on the editable install's generated .pth file
+# (see docs/00_NOTAS_PERSONALES_INSTALACIONES.txt, Fase 2 — that .pth is not
+# auto-processed in this environment).
+pythonpath = ["src", "."]

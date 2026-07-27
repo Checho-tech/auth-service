@@ -1,0 +1,385 @@
+====================================================================
+NOTAS PERSONALES - AUTH SERVICE PROJECT
+Registro de todo lo instalado/configurado en este Mac durante el proyecto
+====================================================================
+
+Este archivo es solo para ti (Sergio). Aqui se anota, en orden cronologico,
+cada cosa que se instala o configura en tu computador para este proyecto,
+por que se instala, y como desinstalarla si algun dia quieres revertirlo.
+
+--------------------------------------------------------------------
+[2026-07-27] DIAGNOSTICO INICIAL DEL SISTEMA
+--------------------------------------------------------------------
+
+Ya tenias instalado (no se toco nada):
+  - Homebrew 6.0.12
+  - Git 2.50.1
+  - Python 3.12.13 (via Homebrew, en /opt/homebrew/bin/python3.12)
+    Nota: tambien tienes un Python 3.9.6 como "python3" del sistema.
+    Usaremos explicitamente "python3.12" para este proyecto.
+
+Falta instalar:
+  - Docker Desktop -> pendiente de confirmacion antes de instalar
+
+--------------------------------------------------------------------
+PENDIENTE DE INSTALAR (se movera arriba cuando se instale)
+--------------------------------------------------------------------
+
+  [ ] Docker Desktop
+      Por que: para correr PostgreSQL y el servicio en contenedores,
+      sin instalar Postgres directamente en tu Mac.
+      Como se instalaria: brew install --cask docker
+      Como desinstalar despues: brew uninstall --cask docker
+                                 (y borrar ~/Library/Group Containers/*docker*
+                                 si quieres limpiar configuracion residual)
+
+      INTENTO 2026-07-27 (fallido): el instalador automatico necesitaba
+      tu contrasena de administrador de forma interactiva (para crear
+      /usr/local/bin) y el asistente no puede escribir contrasenas por ti.
+      Homebrew deshizo el cambio solo, tu Mac quedo limpio.
+
+      [x] INSTALADO 2026-07-27 (por ti, manualmente):
+      Confirmaste que quedo instalado. Verificacion hecha por el asistente:
+        - Docker.app presente en /Applications
+        - Docker version 29.6.2 (build dfc4efb)
+        - Docker Compose version v5.3.1 (plugin "docker compose", no el
+          antiguo "docker-compose" standalone que ya esta deprecado)
+        - Daemon arrancado (el asistente ejecuto: open -a Docker)
+        - Prueba real: `docker run --rm hello-world` -> funciono OK
+      Como desinstalar despues: mover /Applications/Docker.app a la papelera
+      y borrar ~/Library/Group Containers/*docker* si quieres limpiar restos.
+      Nota para el futuro: Docker Desktop se debe abrir manualmente (o el
+      asistente lo abre con `open -a Docker`) antes de usar `docker` o
+      `docker compose`, ya que el daemon no arranca solo al reiniciar
+      salvo que actives "Start Docker Desktop when you log in" en su
+      configuracion.
+
+--------------------------------------------------------------------
+YA INSTALADO / CONFIGURADO POR EL ASISTENTE
+--------------------------------------------------------------------
+
+  [x] [2026-07-27] Entorno virtual del proyecto (venv)
+      Por que: aislar las dependencias de Python (FastAPI, SQLAlchemy, etc.)
+      para que no se instalen "globalmente" en tu Mac.
+      Se creo en: auth-service/.venv (usando python3.12)
+      No requirio contrasena ni permisos especiales.
+      Como desinstalar: simplemente borrar la carpeta .venv
+      Como activarlo tu mismo en el futuro (si abres una terminal nueva):
+          cd ~/Desktop/auth-service && source .venv/bin/activate
+
+  [x] [2026-07-27] Dependencias Python instaladas DENTRO del venv,
+      no afectan a tu sistema global. Lista completa versionada en:
+      auth-service/requirements-lock.txt (54 paquetes, generado con
+      "pip freeze" para que el proyecto sea reproducible en cualquier
+      maquina).
+
+      Las mas relevantes y por que se eligieron:
+        - fastapi 0.140.1 + uvicorn 0.51.0  -> framework web async
+        - sqlalchemy 2.0.51 + asyncpg 0.31.0 -> ORM async (no bloquea
+          el event loop de FastAPI esperando a Postgres)
+        - alembic 1.18.5  -> migraciones de base de datos versionadas
+        - PyJWT 2.13.0    -> JWT. Elegido sobre "python-jose" por menor
+          superficie de ataque (python-jose tuvo CVEs de confusion de
+          algoritmo "alg: none")
+        - passlib 1.7.4 + bcrypt 5.0.0 -> hashing de contrasenas
+        - slowapi 0.1.10  -> rate limiting (fuerza bruta en login)
+        - structlog 24.4.0 -> logging estructurado en JSON
+        - pydantic-settings 2.14.2 -> config tipada desde variables de
+          entorno, la app falla al arrancar si falta una variable critica
+        - pytest, httpx, ruff, mypy -> testing y calidad de codigo (dev only)
+
+      Como reinstalar en otra maquina (o si borras .venv por error):
+          cd ~/Desktop/auth-service
+          python3.12 -m venv .venv
+          source .venv/bin/activate
+          pip install -e ".[dev]"
+
+  [x] [2026-07-27] Archivo .env creado en auth-service/.env (LOCAL, NO
+      se sube a git, protegido por .gitignore). Contiene un
+      JWT_SECRET_KEY generado de forma segura y aleatoria con el modulo
+      "secrets" de Python (secrets.token_hex(32)), no un valor inventado.
+      Si algun dia necesitas regenerarlo:
+          python3.12 -c "import secrets; print(secrets.token_hex(32))"
+
+  [x] [2026-07-27] Repositorio Git inicializado en auth-service/ (git init).
+      Aun SIN ningun commit -- eso se hara solo cuando tu lo pidas
+      explicitamente.
+
+  [x] [2026-07-27] Verificacion funcional: se levanto el servidor con
+      uvicorn en background en el puerto 8001, se probo GET /health
+      (respondio {"status":"ok"}) y GET /docs (Swagger UI, status 200),
+      y se detuvo el proceso de prueba. No quedo nada corriendo en
+      segundo plano.
+
+--------------------------------------------------------------------
+[2026-07-27] FASE 2 - BASE DE DATOS
+--------------------------------------------------------------------
+
+  [x] Modelos SQLAlchemy creados (8 tablas): users, roles, permissions,
+      user_roles, role_permissions, refresh_tokens, password_reset_tokens,
+      audit_logs. Ubicados en auth-service/src/auth_service/infrastructure/
+      database/models/
+
+  [x] Alembic configurado en modo async (auth-service/alembic/).
+      La URL de conexion se lee del .env (una sola fuente de verdad, nunca
+      duplicada en alembic.ini).
+
+  [x] Dos migraciones generadas y verificadas:
+        1. 2673e33a035a_create_initial_schema.py -> crea las 8 tablas
+        2. d9922a8a7497_seed_default_roles_and_permissions.py -> inserta
+           roles (admin, manager, employee) y sus permisos base
+
+  [x] NOTA TECNICA (curiosidad resuelta, no requiere accion tuya):
+      la instalacion editable de Python (pip install -e) no estaba
+      añadiendo automaticamente "src/" al PYTHONPATH en esta maquina
+      (el archivo .pth que genera pip no se procesaba). Se soluciono
+      añadiendo la ruta explicitamente en alembic/env.py. Esto no afecta
+      a Docker en produccion (alli se instala el paquete de forma normal,
+      no editable), solo era relevante para correr Alembic en local.
+
+  [x] Se levanto un contenedor Postgres TEMPORAL (postgres:16-alpine,
+      nombre "auth_pg_temp") solo para generar y probar las migraciones.
+      Se verifico: creacion de las 8 tablas, insercion de roles/permisos,
+      y que el rollback (downgrade) funciona correctamente.
+      El contenedor ya fue detenido y eliminado (--rm). El docker-compose.yml
+      definitivo con Postgres persistente se creara en la Fase 6.
+
+--------------------------------------------------------------------
+[2026-07-27] FASE 3 - AUTENTICACION
+--------------------------------------------------------------------
+
+  [x] Implementado: registro, verificacion de email (mock), login,
+      refresh token con ROTACION + deteccion de reuso (robo de token),
+      logout, cambio de contrasena, "olvide mi contrasena" / reset,
+      bloqueo de cuenta tras 5 intentos fallidos, rate limiting en
+      login y forgot-password, y perfil de usuario (GET /me).
+
+  [x] [2026-07-27] FIX DE COMPATIBILIDAD: passlib 1.7.4 (su ultima
+      version, sin actualizar desde 2020) es incompatible con bcrypt
+      >=4.1 (cambio de API interna), causando un error enganoso
+      "password cannot be longer than 72 bytes" incluso con passwords
+      cortas. Solucion: se fijo bcrypt<4.1 en pyproject.toml.
+      Se reinstalo con: pip install "bcrypt<4.1"
+      Version final instalada: bcrypt==4.0.1 (ver requirements-lock.txt,
+      regenerado tras este cambio).
+
+  [x] Verificacion funcional completa (no solo "compila"), contra un
+      Postgres real levantado temporalmente (mismo patron que Fase 2:
+      se uso y se elimino, el docker-compose.yml definitivo es Fase 6):
+        - Registro + verificacion de email via token (leido del log
+          del "mock SMTP", que solo imprime el email en vez de enviarlo)
+        - Login exitoso, acceso a /me con el access token, y bloqueo
+          correcto (401) sin token
+        - Refresh token: rotacion exitosa Y deteccion de reuso del
+          token viejo (revoca todas las sesiones del usuario)
+        - Registro duplicado -> 409, password debil -> 422
+        - 5 intentos fallidos -> cuenta bloqueada (423 Locked) con
+          fecha exacta de desbloqueo
+        - Se encontro y corrigio un bug real durante esta prueba: el
+          reset de contrasena no desbloqueaba la cuenta. Corregido en
+          auth_service.py (reset_password ahora tambien limpia el
+          contador de intentos fallidos).
+        - Todos los eventos quedaron trazados correctamente en la
+          tabla audit_logs (user_registered, login_success,
+          login_failed, account_locked, password_reset_completed, etc.)
+
+--------------------------------------------------------------------
+[2026-07-27] FASE 4 - AUTORIZACION (ROLES Y PERMISOS)
+--------------------------------------------------------------------
+
+  [x] Implementado: dependencia "require_permission(codigo)" reutilizable
+      en cualquier endpoint, servicio UserManagementService (listar
+      usuarios, asignar roles, desactivar usuario, leer audit log), y
+      4 endpoints nuevos protegidos por permiso especifico:
+        GET    /api/v1/users              (requiere users:read)
+        PATCH  /api/v1/users/{id}/roles   (requiere roles:manage)
+        DELETE /api/v1/users/{id}         (requiere users:delete)
+        GET    /api/v1/audit-logs         (requiere audit:read)
+
+  [x] Decision de diseno clave: los permisos se verifican consultando la
+      base de datos EN CADA REQUEST (no se confia en lo que dice el JWT),
+      asi que si un Admin le quita un permiso a un rol, aplica en la
+      siguiente peticion inmediatamente, no cuando expire el token de
+      15 minutos. Verificado en vivo: se promovio un usuario a admin via
+      API y, CON EL MISMO access token emitido antes de la promocion
+      (sin volver a hacer login), ya pudo acceder a /audit-logs.
+
+  [x] BUG DE SEGURIDAD REAL encontrado y corregido durante las pruebas:
+      un usuario desactivado (DELETE /users/{id}) SI podia volver a
+      hacer login y obtener tokens nuevos, anulando la desactivacion.
+      Se agrego la verificacion "is_active" en AuthService.login()
+      (dominio: nueva excepcion AccountDeactivatedError). Verificado:
+      ahora el login de una cuenta desactivada devuelve 403.
+
+  [x] Verificacion funcional completa contra Postgres real (mismo patron
+      de las fases anteriores, contenedor temporal ya eliminado): se
+      registraron 2 usuarios, se promovio uno a admin (bootstrap manual
+      via SQL la primera vez, ya que no existe un admin previo capaz de
+      asignarlo por API), y se probaron los 4 endpoints con permisos
+      correctos e incorrectos (403 cuando falta el permiso).
+
+  [x] NOTA PARA FASE 8 (README, "mejoras futuras"): el primer usuario
+      Admin del sistema hoy se crea manualmente en la base de datos
+      (no hay un comando de "bootstrap" automatizado). Es una limitacion
+      conocida y aceptable para un proyecto de portfolio; en produccion
+      se resolveria con un script de seed o un comando de management.
+
+--------------------------------------------------------------------
+[2026-07-27] FASE 5 - TESTING
+--------------------------------------------------------------------
+
+  [x] 20 tests UNITARIOS (tests/unit/): prueban AuthService y
+      UserManagementService con repositorios FALSOS en memoria (no usan
+      Docker ni Postgres, corren en ~4 segundos). Esto es lo que demuestra
+      que el Repository Pattern de la Fase 1 no fue decorativo.
+
+  [x] 10 tests de INTEGRACION (tests/integration/): prueban los endpoints
+      reales de la API contra un Postgres real, usando el mismo patron de
+      contenedor temporal que usamos manualmente en las Fases 2-4, ahora
+      AUTOMATIZADO dentro de un fixture de pytest (arranca antes de la
+      sesion de tests, corre las migraciones, y se autodestruye al final).
+      No se agrego ninguna libreria nueva para esto (no testcontainers):
+      se reutilizo subprocess + docker CLI, exactamente el mismo script
+      que ya habiamos validado que funciona en este Mac.
+
+  [x] PROBLEMAS TECNICOS ENCONTRADOS Y RESUELTOS (no eran bugs de la app,
+      sino de como correr los tests):
+        1. pytest-asyncio crea un event loop nuevo por cada test por
+           defecto, pero el motor de base de datos de la app es un
+           singleton a nivel de modulo (igual que en produccion, donde
+           solo hay un event loop para toda la vida de la app). Esto
+           causaba errores "attached to a different loop". Solucion:
+           configurar pytest-asyncio para compartir un unico event loop
+           en toda la sesion (asyncio_default_test_loop_scope = "session"
+           en pyproject.toml).
+        2. El rate limit de login (5/minuto) se disparaba entre tests
+           porque todos comparten la misma "IP" simulada del cliente de
+           pruebas. Solucion: se sube ese limite SOLO en el entorno de
+           tests (variable de entorno RATE_LIMIT_LOGIN), sin tocar el
+           limite real de produccion.
+
+  [x] Se aprovecho para pasar "ruff" (el linter) sobre todo el codigo y
+      corregir 90+ advertencias de estilo (lineas largas, una variable
+      sin usar). Cero advertencias ahora: "ruff check src tests" -> OK.
+
+  [x] Resultado final: 30/30 tests pasan (pytest -q). El contenedor de
+      Postgres de test se crea y se destruye solo en cada corrida, no
+      queda nada residual en Docker.
+
+--------------------------------------------------------------------
+[2026-07-27] FASE 6 - DOCKER Y DOCKER COMPOSE
+--------------------------------------------------------------------
+
+  [x] Dockerfile multi-stage (builder + runtime), usuario no-root
+      ("appuser"), healthcheck sin depender de curl (usa urllib de Python).
+
+  [x] docker-compose.yml con 3 servicios: db (Postgres con volumen
+      persistente), migrate (corre "alembic upgrade head" UNA sola vez
+      y se apaga), app (espera a que migrate termine con exito antes
+      de arrancar). Esto evita que varias replicas de "app" corran
+      migraciones en paralelo (condicion de carrera real en produccion).
+
+  [x] Imagenes construidas localmente por Docker (no requiere descargar
+      nada adicional en tu Mac aparte de lo que Docker ya gestiona):
+        auth-service-app:latest       (~554MB)
+        auth-service-migrate:latest   (misma imagen, mismo Dockerfile)
+      Se quedan en tu cache local de Docker (`docker images`). Si quieres
+      liberar espacio en disco mas adelante: `docker image rm auth-service-app auth-service-migrate`
+
+  [x] Verificacion funcional completa con "docker compose up --build":
+        - Los 3 servicios arrancaron en el orden correcto (db healthy ->
+          migrate corrio y termino -> app arranco)
+        - Flujo completo de auth (registro, verificacion, login, perfil
+          protegido) probado contra el stack real de Docker, no procesos
+          sueltos
+        - Confirmado que el contenedor corre como usuario no-root
+          (appuser, uid 999, no root)
+        - Se reinicio TODO el stack (db + app) y los datos siguieron ahi
+          (login funciono sin volver a registrar), confirmando que el
+          volumen de Postgres persiste correctamente
+      Al terminar la verificacion se hizo "docker compose down -v" para
+      dejar Docker limpio (sin contenedores ni volumenes de prueba
+      corriendo en segundo plano). Las IMAGENES si se quedaron (ver arriba).
+
+  [x] Como levantar el proyecto completo de ahora en adelante (para ti,
+      en el futuro, sin necesitar a nadie mas):
+          cd ~/Desktop/auth-service
+          docker compose up --build
+      Y para apagarlo:
+          docker compose down       (conserva los datos)
+          docker compose down -v    (borra tambien los datos de Postgres)
+
+--------------------------------------------------------------------
+[2026-07-27] FASE 7 - CI/CD (GITHUB ACTIONS)
+--------------------------------------------------------------------
+
+  [x] Se ejecuto "mypy" (modo strict) por primera vez desde que se
+      configuro en la Fase 1 -- encontro 12 errores reales de tipado
+      (no bugs de comportamiento, pero si huecos de tipado que un CI
+      real habria bloqueado). Todos corregidos:
+        - varios "dict" sin tipar -> "dict[str, object]" / "dict[str, Any]"
+        - passlib no tiene stubs de tipos mantenidos -> se agrego un
+          override en pyproject.toml para ignorar esa libreria puntual
+        - hash_password/verify_password devolvian "Any" -> se envuelve
+          el resultado en str()/bool() explicito
+        - conflicto de tipos entre slowapi y Starlette en el handler de
+          rate limit -> comentado y silenciado con type: ignore (es un
+          desajuste conocido entre las dos librerias, no un bug real)
+      Resultado: "mypy src" -> Success: no issues found in 51 source files
+
+  [x] Creado .github/workflows/ci.yml con 4 jobs:
+        lint              -> ruff + mypy
+        unit-tests        -> pytest tests/unit (sin Docker)
+        integration-tests -> pytest tests/integration (con Docker; los
+                              runners de GitHub Actions ya traen Docker
+                              instalado, así que el mismo conftest.py que
+                              levanta Postgres localmente funciona igual
+                              ahi, sin configuracion adicional)
+        docker-build      -> construye la imagen de produccion, solo si
+                              los 3 jobs anteriores pasaron
+      Los 3 primeros corren en PARALELO (mas rapido); docker-build espera
+      a que los 3 terminen bien.
+
+  [x] LIMITACION CONOCIDA: este workflow no se ha podido "correr de
+      verdad" todavia porque el repositorio no tiene un remoto en GitHub
+      (solo existe "git init" local, sin commits). Cada comando individual
+      que usa el workflow (ruff, mypy, pytest x2, docker build) SI se
+      verifico que funciona en este Mac. La verificacion final 100% real
+      del workflow requiere crear el repo en GitHub y hacer push -- eso
+      queda pendiente de que tu decidas cuando quieres hacerlo.
+
+--------------------------------------------------------------------
+[2026-07-27] FASE 8 - DOCUMENTACION FINAL (README)
+--------------------------------------------------------------------
+
+  [x] README.md profesional creado en ingles (idioma del proyecto),
+      cubriendo: descripcion, arquitectura (Clean Architecture explicada),
+      stack tecnico, diagrama ER en Mermaid (se renderiza solo en GitHub),
+      instalacion (Docker Compose y local), variables de entorno,
+      referencia de la API (tabla de endpoints + ejemplo real de curl),
+      seguridad (resumen de todas las decisiones tomadas en Fases 3-4),
+      testing, CI/CD, estructura del proyecto, y limitaciones conocidas
+      / mejoras futuras (incluyendo el bootstrap manual del primer admin
+      que quedo anotado como pendiente en la Fase 4).
+
+  [x] Se verifico que todo lo escrito en el README coincide con el
+      codigo real: nombres de variables de entorno (.env.example),
+      nombres de los servicios de docker-compose.yml, y la sintaxis
+      del diagrama Mermaid.
+
+  [x] PENDIENTE (a tu criterio, no lo hice sin que lo pidas):
+        - El badge de CI en el README tiene un placeholder "OWNER/REPO"
+          que hay que reemplazar cuando crees el repositorio en GitHub.
+        - Aun no se ha hecho NINGUN commit de git en todo el proyecto
+          (recordatorio: solo hago commits cuando tu lo pides explicitamente).
+
+====================================================================
+PROYECTO COMPLETO: LAS 8 FASES DEL ROADMAP ESTAN TERMINADAS
+====================================================================
+
+--------------------------------------------------------------------
+UBICACION DEL PROYECTO
+--------------------------------------------------------------------
+  /Users/sergiomorillo/Desktop/auth-service
+
+====================================================================
