@@ -41,5 +41,18 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Reachable from the *browser*, not from inside the Docker network —
+        # see the Dockerfile comment for why this can't be "http://app:8000".
+        VITE_API_BASE_URL: http://localhost:8000
+    ports:
+      - "5173:80"
+    depends_on:
+      app:
+        condition: service_healthy
+
 volumes:
   db_data:

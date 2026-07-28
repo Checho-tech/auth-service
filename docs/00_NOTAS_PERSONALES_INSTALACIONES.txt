@@ -445,6 +445,49 @@ PROYECTO COMPLETO: LAS 8 FASES DEL ROADMAP ESTAN TERMINADAS
       propio navegador.
 
 --------------------------------------------------------------------
+[2026-07-28] FRONTEND: DOCKER COMPOSE + PRIMER COMMIT
+--------------------------------------------------------------------
+
+  [x] Se creo un commit nuevo (f2682aa) con todo el frontend + los
+      cambios de CORS del backend. Working tree limpio.
+
+  [x] Se agrego frontend/Dockerfile (multi-stage: build con Node,
+      servido en produccion con Nginx) y frontend/nginx.conf (con el
+      fallback a index.html necesario para el enrutamiento de React).
+
+  [x] docker-compose.yml ahora tiene 4 servicios: db, migrate, app,
+      y frontend (nuevo). Un solo comando levanta TODO:
+          docker compose up --build
+
+  [x] Verificado con el stack completo levantado desde cero:
+      el frontend dockerizado responde en localhost:5173 (status 200,
+      titulo correcto), y se confirmo que el usuario que registraste y
+      probaste manualmente en el navegador (ChechoTECH@example.com,
+      verificado, activo) seguia intacto en la base de datos tras el
+      "docker compose down" + "up --build" (el volumen de Postgres
+      persiste correctamente).
+
+--------------------------------------------------------------------
+[2026-07-28] README + CI ACTUALIZADOS CON EL FRONTEND
+--------------------------------------------------------------------
+
+  [x] README.md: nueva seccion "Frontend" (como correrlo, por que no
+      se guarda el refresh token en cookie httpOnly -- limitacion
+      documentada honestamente), tabla de stack actualizada, variable
+      CORS_ORIGINS documentada, estructura del proyecto actualizada,
+      y "Known limitations" con 2 items nuevos (localStorage del
+      refresh token, frontend sin suite de tests todavia).
+
+  [x] .github/workflows/ci.yml: nuevo job "frontend" (npm ci, type-check
+      con tsc, build de Vite, lint con oxlint) corriendo en paralelo con
+      los jobs del backend. El job "docker-build" ahora tambien construye
+      la imagen del frontend, y espera a los 4 jobs anteriores.
+
+  [x] Verificado localmente exactamente igual a como correria en CI:
+      "npm ci" (instalacion limpia, no "npm install"), "npm run build",
+      "npm run lint", y "docker build ./frontend" -- los 4 pasan.
+
+--------------------------------------------------------------------
 UBICACION DEL PROYECTO
 --------------------------------------------------------------------
   /Users/sergiomorillo/Desktop/auth-service

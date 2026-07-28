@@ -19,6 +19,7 @@ Built as a portfolio project — designed to be consumed by other services, and 
 - [Tech stack](#tech-stack)
 - [Database schema](#database-schema)
 - [Getting started](#getting-started)
+- [Frontend](#frontend)
 - [Environment variables](#environment-variables)
 - [API reference](#api-reference)
 - [Security](#security)
@@ -43,6 +44,7 @@ Built as a portfolio project — designed to be consumed by other services, and 
 - Structured (JSON) audit logging of every security-relevant event
 - Per-route rate limiting (brute-force protection on login and password-reset endpoints)
 - Auto-generated OpenAPI/Swagger documentation
+- A React console (`frontend/`) covering the whole flow above, plus a role-gated admin panel — see [Frontend](#frontend)
 
 ## Architecture
 
@@ -79,6 +81,7 @@ The payoff: `AuthService` and `UserManagementService` are unit-tested with in-me
 | Linting / types | ruff, mypy (strict) | Fast, comprehensive static analysis |
 | Containerization | Docker, Docker Compose | Multi-stage build, non-root runtime user |
 | CI/CD | GitHub Actions | Lint, unit tests, integration tests, Docker build |
+| Frontend | React 19, Vite, TypeScript | See [Frontend](#frontend) |
 
 ## Database schema
 
@@ -164,8 +167,9 @@ python3 -c "import secrets; print(secrets.token_hex(32))"
 docker compose up --build
 ```
 
-This starts three services in order: `db` (Postgres, with a persistent volume) → `migrate` (runs `alembic upgrade head` once, then exits) → `app` (the API, on `http://localhost:8000`).
+This starts four services in order: `db` (Postgres, with a persistent volume) → `migrate` (runs `alembic upgrade head` once, then exits) → `app` (the API) → `frontend` (a static build served by Nginx).
 
+- Console (frontend): `http://localhost:5173`
 - Interactive API docs: `http://localhost:8000/docs`
 - Health check: `http://localhost:8000/health`
 
@@ -199,6 +203,31 @@ WHERE u.email = 'you@example.com' AND r.name = 'admin';
 
 From there, that Admin can promote anyone else via `PATCH /api/v1/users/{id}/roles`.
 
+## Frontend
+
+A React console in `frontend/` exercises every endpoint the API exposes: registration, email verification, login, a profile dashboard with password change, forgot/reset password, and an admin panel (user list, role assignment, deactivation, audit log — shown only to `admin`/`manager` accounts).
+
+No UI framework — a small custom design system instead (CSS custom properties for color/type/spacing, IBM Plex Sans/Mono, automatic light/dark support), kept intentionally simple for a service this size.
+
+**Running it:**
+
+```bash
+# Via Docker Compose — already included in `docker compose up --build` above.
+# Or standalone, for frontend-only development with hot reload:
+cd frontend
+npm install
+cp .env.example .env.local   # VITE_API_BASE_URL, defaults to localhost:8000
+npm run dev                  # http://localhost:5173
+```
+
+**Since email is mocked**, the verification and password-reset screens ask you to paste a token instead of clicking a link — grab it from the backend logs:
+
+```bash
+docker compose logs app | grep mock_email_sent
+```
+
+**Token storage trade-off, stated plainly:** the access token lives in memory only (lost on page reload, re-derived from the refresh token); the refresh token is kept in `localStorage`, because this API returns it in the JSON response body rather than as an httpOnly cookie. A production deployment would prefer the backend set it as an httpOnly, Secure cookie instead, keeping it out of reach of any XSS in the frontend entirely — that's a backend API change out of scope here, documented in `frontend/src/api/tokenStore.ts`.
+
 ## Environment variables
 
 All variables are documented with safe defaults in `.env.example`. Never commit a real `.env` — it's already excluded via `.gitignore`.
@@ -215,6 +244,7 @@ All variables are documented with safe defaults in `.env.example`. Never commit 
 | `MAX_FAILED_LOGIN_ATTEMPTS` | Failed logins before account lockout (default 5) |
 | `ACCOUNT_LOCK_DURATION_MINUTES` | How long a locked account stays locked (default 15) |
 | `RATE_LIMIT_LOGIN` | slowapi rate string, e.g. `5/minute` |
+| `CORS_ORIGINS` | Comma-separated browser origins allowed to call the API (default `http://localhost:5173`, the frontend's dev server) |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_FROM_EMAIL` | Unused by the mock email sender today; kept for a future real-SMTP swap |
 
 ## API reference
@@ -284,9 +314,10 @@ pytest                     # both suites
 
 `.github/workflows/ci.yml` runs on every push/PR to `main`:
 
-- `lint` — ruff + mypy (strict), in parallel with:
-- `unit-tests` and `integration-tests`
-- `docker-build` — builds the production image, only if everything above passed
+- `lint` — ruff + mypy (strict) on the backend, in parallel with:
+- `unit-tests` and `integration-tests` (backend)
+- `frontend` — `npm ci`, `tsc` type-check, oxlint, `vite build`
+- `docker-build` — builds both the backend and frontend production images, only if everything above passed
 
 ## Project structure
 
@@ -300,6 +331,11 @@ alembic/                 # Database migrations
 tests/
 ├── unit/                # Fast, no Docker
 └── integration/         # Real Postgres, real HTTP layer
+frontend/
+├── src/api/             # Fetch client, token storage, endpoint wrappers
+├── src/context/         # AuthContext (session state)
+├── src/components/      # Design-system primitives (Button, Card, Pill, AppShell...)
+└── src/pages/           # One file per screen, incl. pages/admin/
 ```
 
 ## Known limitations & future improvements
@@ -310,3 +346,5 @@ tests/
 - **Email is mocked** (logged, not sent). Swapping in a real provider (SES, SendGrid, Postmark) only requires a new class implementing `IEmailSender` — nothing in `AuthService` would change.
 - **Audit log table has no DB-level write protection yet.** The application only ever inserts into it, but that convention isn't enforced with a `REVOKE UPDATE, DELETE` at the database-permission level.
 - **No distributed tracing** (e.g. OpenTelemetry) — would help once this service is actually consumed by others, as originally planned.
+- **Refresh token in `localStorage`** (see [Frontend](#frontend)) instead of an httpOnly cookie — a pragmatic trade-off given this API returns tokens in the response body; revisiting it would mean changing how the backend issues refresh tokens, not just the frontend.
+- **No frontend test suite yet** (the backend has 30 unit + integration tests; the frontend currently only has type-checking and linting as safety nets).
