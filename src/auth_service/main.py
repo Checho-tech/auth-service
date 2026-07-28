@@ -2,6 +2,7 @@
 
 import structlog
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -26,6 +27,13 @@ app = FastAPI(
     docs_url="/docs" if settings.environment != "production" else None,
 )
 app.state.limiter = limiter
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins_list,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 # slowapi's handler is typed against `RateLimitExceeded` specifically, one
 # level narrower than Starlette's generic `Exception` handler signature —
 # a known, harmless mismatch between the two libraries' type stubs.

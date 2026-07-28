@@ -378,6 +378,73 @@ PROYECTO COMPLETO: LAS 8 FASES DEL ROADMAP ESTAN TERMINADAS
 ====================================================================
 
 --------------------------------------------------------------------
+[2026-07-27] PRIMER COMMIT DE GIT
+--------------------------------------------------------------------
+
+  [x] Se creo el primer commit (77 archivos, 4134 lineas) con TODO el
+      proyecto: codigo fuente, tests, Docker, CI/CD y documentacion.
+      Hash: ae9a7ea -- "Initial commit: Authentication & Authorization
+      microservice". Rama: main. Working tree limpio.
+
+  [x] Confirmado antes de commitear: el archivo .env real (con tu
+      JWT_SECRET_KEY generado) NO se incluyo (protegido por .gitignore),
+      solo se subio .env.example con placeholders.
+
+  [ ] NO se ha hecho push a ningun lado. El repo sigue siendo 100% local.
+      Cuando quieras subirlo a GitHub, avisame y te ayudo con:
+        gh repo create   (o crearlo manualmente en github.com)
+        git remote add origin <url>
+        git push -u origin main
+
+--------------------------------------------------------------------
+[2026-07-27] FASE 9 - FRONTEND (React + Vite)
+--------------------------------------------------------------------
+
+  [x] Node.js instalado via Homebrew (brew install node), sin pedir
+      contrasena (a diferencia de Docker Desktop en la Fase 1).
+      Version instalada: node v26.5.0, npm 11.17.0
+      Como desinstalar: brew uninstall node
+
+  [x] Frontend construido en auth-service/frontend/ con React 19 + Vite 8
+      + TypeScript. Dependencias: react-router-dom (enrutamiento). Sin
+      libreria de UI externa: sistema de diseno propio (tokens CSS,
+      tipografia IBM Plex Sans/Mono via Google Fonts, paleta teal sobria
+      con soporte claro/oscuro automatico segun el sistema).
+
+  [x] Backend modificado para permitir esto: se agrego CORS
+      (fastapi.middleware.cors) y una variable de entorno nueva
+      CORS_ORIGINS en .env / .env.example (por defecto
+      http://localhost:5173, el puerto de Vite).
+
+  [x] Paginas construidas: registro, verificacion de email (con
+      instrucciones claras de que el SMTP es simulado y hay que copiar
+      el token de los logs), login, dashboard de perfil (+ cambiar
+      contrasena), forgot/reset password, y panel de administracion
+      (listar usuarios + asignar roles + desactivar, y ver el audit log)
+      -- este ultimo solo visible si el usuario tiene rol admin/manager.
+
+  [x] Decision de seguridad documentada en el codigo (api/tokenStore.ts):
+      el access token se guarda solo en memoria (se pierde al recargar
+      la pagina, y se recupera solo via el refresh token), y el refresh
+      token se guarda en localStorage. Lo ideal en produccion seria que
+      el backend lo entregara como cookie httpOnly en vez de en el JSON
+      -- eso requeriria un cambio de backend que no se hizo aqui, y
+      queda anotado como limitacion conocida.
+
+  [x] Verificado: "npm run build" (compila TypeScript + build de Vite)
+      sin errores, "npm run lint" sin advertencias, CORS funcionando
+      (probado con una peticion OPTIONS real simulando el navegador),
+      y el frontend sirviendo correctamente en localhost:5173 contra
+      el backend real en localhost:8000 (via Docker Compose).
+
+  [ ] LIMITACION IMPORTANTE: no pude verificar visualmente el resultado
+      en un navegador real (no tengo esa capacidad en este entorno).
+      Verifique que compila, tipa y se conecta correctamente al backend,
+      pero el aspecto visual final (si el diseno se ve como se penso)
+      lo tienes que confirmar tu abriendo http://localhost:5173 en tu
+      propio navegador.
+
+--------------------------------------------------------------------
 UBICACION DEL PROYECTO
 --------------------------------------------------------------------
   /Users/sergiomorillo/Desktop/auth-service

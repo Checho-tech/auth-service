@@ -32,6 +32,14 @@ class Settings(BaseSettings):
 
     rate_limit_login: str = "5/minute"
 
+    # Comma-separated in .env (e.g. "http://localhost:5173,https://app.example.com");
+    # the frontend's dev server and, later, its deployed origin both need to be listed.
+    cors_origins: str = "http://localhost:5173"
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
     smtp_host: str = "localhost"
     smtp_port: int = 1025
     smtp_from_email: str = "noreply@auth-service.local"

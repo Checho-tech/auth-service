@@ -1,0 +1,34 @@
+.form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.form-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+/* Full-width primary action, used on the single-purpose auth screens
+   (login/register/reset). Dashboard-style forms keep the button
+   its natural width instead. */
+.form-actions-stretch .btn {
+  width: 100%;
+}
+
+.form-links {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-sm);
+}
+
+.form-links a {
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.form-links a:hover {
+  text-decoration: underline;
+}
