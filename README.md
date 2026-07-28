@@ -4,11 +4,7 @@ A standalone, production-grade **Authentication & Authorization microservice** b
 
 Built as a portfolio project — designed to be consumed by other services, and to showcase the kind of engineering judgment (not just working code) expected at a senior level.
 
-<!--
-  Once you push this repo to GitHub, replace OWNER/REPO below with your
-  actual GitHub username/repository name so the badge renders correctly.
--->
-![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)
+[![CI](https://github.com/Checho-tech/auth-service/actions/workflows/ci.yml/badge.svg)](https://github.com/Checho-tech/auth-service/actions/workflows/ci.yml)
 
 ---
 
@@ -158,7 +154,7 @@ Seeded roles and their default permissions (`alembic/versions/..._seed_default_r
 ### Quickstart with Docker Compose (recommended)
 
 ```bash
-git clone <this-repo>
+git clone https://github.com/Checho-tech/auth-service.git
 cd auth-service
 cp .env.example .env
 # Generate a real secret and paste it into .env as JWT_SECRET_KEY:
