@@ -54,9 +54,10 @@ async def get_auth_service(
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
     auth_service: AuthService = Depends(get_auth_service),
+    settings: Settings = Depends(get_settings),
 ) -> UserEntity:
     try:
-        payload = decode_token(credentials.credentials, expected_type="access")
+        payload = decode_token(settings, credentials.credentials, expected_type="access")
     except InvalidTokenError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

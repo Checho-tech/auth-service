@@ -75,7 +75,7 @@ class AuthService:
 
         user = await self._users.create(email, hash_password(password), full_name)
 
-        verification_token = create_email_verification_token(user.id)
+        verification_token = create_email_verification_token(self._settings, user.id)
         await self._email.send(
             to=email,
             subject="Verify your email",
@@ -86,7 +86,7 @@ class AuthService:
 
     async def verify_email(self, token: str) -> None:
         try:
-            payload = decode_token(token, expected_type="email_verification")
+            payload = decode_token(self._settings, token, expected_type="email_verification")
         except InvalidTokenError:
             raise
         user_id = UUID(payload["sub"])
@@ -147,9 +147,9 @@ class AuthService:
     async def _issue_token_pair(
         self, user_id: UUID, role_names: tuple[str, ...], user_agent: str | None
     ) -> TokenPair:
-        access_token = create_access_token(user_id, role_names)
-        refresh_token = create_refresh_token(user_id)
-        payload = decode_token(refresh_token, expected_type="refresh")
+        access_token = create_access_token(self._settings, user_id, role_names)
+        refresh_token = create_refresh_token(self._settings, user_id)
+        payload = decode_token(self._settings, refresh_token, expected_type="refresh")
         await self._refresh_tokens.create(
             user_id=user_id,
             token_hash=hash_token(refresh_token),
@@ -162,7 +162,7 @@ class AuthService:
         # Return value unused on purpose: decoding still validates the
         # signature and expiry as a side effect, raising InvalidTokenError
         # before we ever touch the DB for a forged or expired token.
-        decode_token(raw_refresh_token, expected_type="refresh")
+        decode_token(self._settings, raw_refresh_token, expected_type="refresh")
         token_hash = hash_token(raw_refresh_token)
         stored = await self._refresh_tokens.get_by_hash(token_hash)
 

@@ -4,6 +4,13 @@ Two token types share this module but are never interchangeable:
   - "access"  -> short-lived, sent on every request, never stored server-side.
   - "refresh" -> long-lived, stored (hashed) in `refresh_tokens` so it can be revoked.
 
+Every function takes `settings` as an explicit parameter rather than calling
+the global `get_settings()` itself. That's what makes AuthService's unit
+tests (Fase 5) work with a hand-built `Settings` instance instead of a real
+`.env` file — the first version of this module called `get_settings()`
+internally, which happened to work locally only because a real `.env`
+physically existed on disk, and failed the moment CI ran without one.
+
 We ALWAYS pass `algorithms=[settings.jwt_algorithm]` explicitly to `jwt.decode`.
 Omitting this lets an attacker submit a token whose header claims a different
 (weaker, or "none") algorithm, and some libraries will trust that instead of
@@ -18,18 +25,18 @@ from uuid import UUID
 import jwt
 
 from auth_service.domain.exceptions import InvalidTokenError
-from auth_service.infrastructure.config import get_settings
+from auth_service.infrastructure.config import Settings
 
 TokenType = Literal["access", "refresh", "email_verification"]
 
 
 def _create_token(
+    settings: Settings,
     user_id: UUID,
     token_type: TokenType,
     expires_delta: timedelta,
     extra_claims: dict[str, Any] | None = None,
 ) -> str:
-    settings = get_settings()
     now = datetime.now(UTC)
     payload = {
         "sub": str(user_id),
@@ -42,9 +49,9 @@ def _create_token(
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
-def create_access_token(user_id: UUID, role_names: tuple[str, ...]) -> str:
-    settings = get_settings()
+def create_access_token(settings: Settings, user_id: UUID, role_names: tuple[str, ...]) -> str:
     return _create_token(
+        settings,
         user_id,
         "access",
         timedelta(minutes=settings.access_token_expire_minutes),
@@ -52,20 +59,20 @@ def create_access_token(user_id: UUID, role_names: tuple[str, ...]) -> str:
     )
 
 
-def create_refresh_token(user_id: UUID) -> str:
-    settings = get_settings()
-    return _create_token(user_id, "refresh", timedelta(days=settings.refresh_token_expire_days))
+def create_refresh_token(settings: Settings, user_id: UUID) -> str:
+    return _create_token(
+        settings, user_id, "refresh", timedelta(days=settings.refresh_token_expire_days)
+    )
 
 
-def create_email_verification_token(user_id: UUID) -> str:
+def create_email_verification_token(settings: Settings, user_id: UUID) -> str:
     # Stateless on purpose: verifying an email is idempotent (doing it twice
     # is harmless), so there's no need for the DB-tracked revocation that
     # refresh/reset tokens require. The signature alone prevents tampering.
-    return _create_token(user_id, "email_verification", timedelta(hours=24))
+    return _create_token(settings, user_id, "email_verification", timedelta(hours=24))
 
 
-def decode_token(token: str, expected_type: TokenType) -> dict[str, Any]:
-    settings = get_settings()
+def decode_token(settings: Settings, token: str, expected_type: TokenType) -> dict[str, Any]:
     try:
         payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
     except jwt.ExpiredSignatureError as exc:

@@ -488,6 +488,39 @@ PROYECTO COMPLETO: LAS 8 FASES DEL ROADMAP ESTAN TERMINADAS
       "npm run lint", y "docker build ./frontend" -- los 4 pasan.
 
 --------------------------------------------------------------------
+[2026-07-28] REPO CREADO EN GITHUB + BUG REAL ENCONTRADO POR EL CI
+--------------------------------------------------------------------
+
+  [x] Repositorio creado: https://github.com/Checho-tech/auth-service
+      (publico, usando "gh repo create" ya autenticado en tu Mac como
+      "Checho-tech"). Se agrego como remoto "origin".
+
+  [x] README actualizado: badge de CI con la URL real (ya no el
+      placeholder OWNER/REPO), y el comando "git clone" con la URL real.
+
+  [x] BUG REAL ENCONTRADO AL CORRER CI POR PRIMERA VEZ (esto es
+      exactamente el tipo de cosa que el CI esta hecho para atrapar):
+      "Unit tests" e "Integration tests" fallaron en GitHub Actions
+      aunque localmente SIEMPRE habian pasado. Causa raiz:
+        - jwt_handler.py llamaba internamente a get_settings() (el
+          singleton que lee tu .env real) en vez de recibir el Settings
+          que ya se inyectaba en AuthService. Funcionaba en tu Mac SOLO
+          porque hay un .env real en el disco -- en GitHub Actions no
+          existe ese archivo (correctamente, nunca se sube a git).
+        - Ademas, tests/integration/conftest.py corria "alembic upgrade
+          head" sin JWT_SECRET_KEY en el entorno, mismo problema.
+      SOLUCION: se refactorizo jwt_handler.py para recibir "settings"
+      como parametro explicito en vez de llamar a get_settings() por su
+      cuenta (Dependency Injection real, no solo de nombre), y se agrego
+      JWT_SECRET_KEY de prueba en conftest.py. Verificado localmente
+      OCULTANDO el .env real dos veces (moviendolo a /tmp y de vuelta)
+      para simular el entorno de CI de verdad antes de subir el fix.
+
+  [x] Confirmado: la app completa (docker compose up, flujo real de
+      registro/login/perfil) sigue funcionando igual despues de este
+      refactor.
+
+--------------------------------------------------------------------
 UBICACION DEL PROYECTO
 --------------------------------------------------------------------
   /Users/sergiomorillo/Desktop/auth-service
