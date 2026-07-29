@@ -3,6 +3,9 @@
 .env.*
 !.env.example
 
+# --- JWT signing keys (RS256): generated per-environment, never committed ---
+keys/
+
 # --- Python ---
 __pycache__/
 *.py[cod]

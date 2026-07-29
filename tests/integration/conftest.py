@@ -30,15 +30,20 @@ os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 # across different tests, all appearing to slowapi as the same client "IP".
 # Loosening it here is a test-environment concern, not a security relaxation.
 os.environ["RATE_LIMIT_LOGIN"] = "1000/minute"
-# Required by Settings (min_length=32) with no default — set here so the
-# integration suite never depends on a developer's local .env existing.
-# A CI runner (or a fresh clone) has neither, and previously this only
-# "worked" locally by accident because a real .env happened to be present.
-os.environ.setdefault("JWT_SECRET_KEY", "integration-test-secret-key-not-used-in-prod-32c")
 
 import pytest  # noqa: E402
 import pytest_asyncio  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
+
+from tests.rsa_test_keys import generate_test_keypair  # noqa: E402
+
+# Required by Settings with no default — set here so the integration suite
+# never depends on a developer's local .env existing. A CI runner (or a
+# fresh clone) has neither, and previously this only "worked" locally by
+# accident because a real .env happened to be present.
+_private_key_path, _public_key_path = generate_test_keypair()
+os.environ.setdefault("JWT_PRIVATE_KEY_PATH", _private_key_path)
+os.environ.setdefault("JWT_PUBLIC_KEY_PATH", _public_key_path)
 
 
 @pytest.fixture(scope="session", autouse=True)

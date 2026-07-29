@@ -1,5 +1,7 @@
 """FastAPI application entrypoint."""
 
+from typing import Any
+
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,6 +10,7 @@ from slowapi.errors import RateLimitExceeded
 
 from auth_service.infrastructure.config import get_settings
 from auth_service.infrastructure.rate_limiting import limiter
+from auth_service.infrastructure.security.jwks import build_jwks
 from auth_service.interfaces.api.v1.routers import admin, auth, users
 
 settings = get_settings()
@@ -49,3 +52,11 @@ async def health_check() -> dict[str, str]:
     """Liveness/readiness probe for orchestrators (Docker, k8s, load balancers)."""
     logger.info("health_check_called")
     return {"status": "ok"}
+
+
+@app.get("/.well-known/jwks.json", tags=["monitoring"])
+async def jwks() -> dict[str, Any]:
+    """Publishes the public key so other services can verify tokens signed
+    here without ever holding a copy of the private key or a shared secret.
+    """
+    return build_jwks(settings)

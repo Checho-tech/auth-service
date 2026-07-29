@@ -157,8 +157,10 @@ Seeded roles and their default permissions (`alembic/versions/..._seed_default_r
 git clone https://github.com/Checho-tech/auth-service.git
 cd auth-service
 cp .env.example .env
-# Generate a real secret and paste it into .env as JWT_SECRET_KEY:
-python3 -c "import secrets; print(secrets.token_hex(32))"
+# Generate your RS256 key pair (never committed — see .gitignore):
+mkdir -p keys
+openssl genrsa -out keys/private.pem 2048
+openssl rsa -in keys/private.pem -pubout -out keys/public.pem
 
 docker compose up --build
 ```
@@ -233,8 +235,8 @@ All variables are documented with safe defaults in `.env.example`. Never commit 
 | `APP_NAME`, `ENVIRONMENT`, `DEBUG` | App metadata; `ENVIRONMENT=production` disables `/docs` |
 | `DATABASE_URL` | Async SQLAlchemy connection string (`postgresql+asyncpg://...`) |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Used by the `db` container and to build `DATABASE_URL` in Docker Compose |
-| `JWT_SECRET_KEY` | **Must** be a random 64-hex-char secret — generate with `secrets.token_hex(32)` |
-| `JWT_ALGORITHM` | Signing algorithm (default `HS256`) |
+| `JWT_ALGORITHM` | Signing algorithm (`RS256` — asymmetric, see [Security](#security)) |
+| `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH` | Paths to the RS256 key pair (default `keys/private.pem` / `keys/public.pem`); generate your own, never commit them |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Access token lifetime (default 15) |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | Refresh token lifetime (default 7) |
 | `MAX_FAILED_LOGIN_ATTEMPTS` | Failed logins before account lockout (default 5) |
@@ -262,6 +264,7 @@ Full request/response schemas are auto-generated and always up to date at `/docs
 | PATCH | `/api/v1/users/{id}/roles` | `roles:manage` permission | Replace a user's roles |
 | DELETE | `/api/v1/users/{id}` | `users:delete` permission | Deactivate a user |
 | GET | `/api/v1/audit-logs` | `audit:read` permission | Read recent audit events |
+| GET | `/.well-known/jwks.json` | — | Public key(s) for verifying this service's JWTs — see [Security](#security) |
 
 Example: register → verify → login → call a protected endpoint
 
@@ -287,7 +290,7 @@ curl localhost:8000/api/v1/users/me -H "Authorization: Bearer <access_token>"
 
 - **Password hashing:** bcrypt via passlib.
 - **Password policy:** minimum length (12+) over forced complexity rules, following NIST 800-63B guidance.
-- **JWT:** access + refresh pair; algorithm is always explicitly allow-listed on decode (prevents "algorithm confusion" attacks).
+- **JWT:** access + refresh pair, signed with **RS256** (asymmetric keys) instead of a shared HS256 secret — this service is meant to be consumed by other, separately-deployed microservices, and a shared secret would mean every consumer holds a string that could also *forge* tokens. The private key never leaves this service; the public key is exposed at `GET /.well-known/jwks.json` in standard JWKS format (RFC 7517), so any consumer can verify tokens with, e.g., PyJWT's `PyJWKClient` — no shared file, no shared secret, and key rotation only requires updating this service. The algorithm is always explicitly allow-listed on decode (prevents "algorithm confusion" attacks).
 - **Refresh token rotation + reuse detection:** a replayed, already-rotated refresh token revokes every session for that user.
 - **Account lockout:** time-based (`locked_until`), self-clears — no manual unlock or background job required.
 - **RBAC:** permissions are re-checked against the database on every request, not cached in the JWT — revoking a permission takes effect on the very next request, not after the token expires.

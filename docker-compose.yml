@@ -35,6 +35,11 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    # RS256 key pair: mounted read-only, never baked into the image (see
+    # .dockerignore) — rotating a key means replacing the file on the host,
+    # not rebuilding the image.
+    volumes:
+      - ./keys:/app/keys:ro
     ports:
       - "8000:8000"
     depends_on:

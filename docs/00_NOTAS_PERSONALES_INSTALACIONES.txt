@@ -521,6 +521,68 @@ PROYECTO COMPLETO: LAS 8 FASES DEL ROADMAP ESTAN TERMINADAS
       refactor.
 
 --------------------------------------------------------------------
+[2026-07-28] CI VALIDADO EN VERDE POR PRIMERA VEZ
+--------------------------------------------------------------------
+
+  [x] Tras el fix del bug de Settings, se subio de nuevo y el pipeline
+      completo de GitHub Actions corrio en VERDE: los 5 jobs pasaron
+      (Lint, Frontend, Integration tests, Unit tests, Build Docker images).
+      Run: https://github.com/Checho-tech/auth-service/actions/runs/30323513168
+      Badge del README ahora refleja el estado real del proyecto.
+
+  [x] Este era el ultimo pendiente del roadmap original: "el CI nunca
+      se habia corrido de verdad". Ya esta validado con datos reales,
+      no solo con comandos sueltos en tu Mac.
+
+--------------------------------------------------------------------
+[2026-07-28] RETROFIT: HS256 -> RS256 + ENDPOINT JWKS
+--------------------------------------------------------------------
+
+  Motivo: empezamos el proyecto 2 (Inventory Service), que necesita
+  verificar los JWT de este servicio sin autenticar nada localmente.
+  Con HS256 (secreto compartido) habria que copiar el mismo
+  JWT_SECRET_KEY en cada microservicio nuevo -- riesgo de seguridad
+  que crece con cada servicio agregado. RS256 lo resuelve: la clave
+  privada nunca sale de aqui, la publica se reparte sin riesgo.
+
+  [x] Generado par de claves RSA 2048-bit con openssl:
+        keys/private.pem  (NUNCA se sube a git, ya en .gitignore)
+        keys/public.pem   (tampoco se sube; cada quien genera el suyo)
+
+  [x] config.py: reemplazado "jwt_secret_key" por "jwt_algorithm=RS256",
+      "jwt_private_key_path", "jwt_public_key_path", y una propiedad
+      "jwt_key_id" (fingerprint de la clave publica, usado como "kid"
+      en el header del JWT para soportar rotacion de claves a futuro).
+
+  [x] jwt_handler.py: firma con la clave privada, verifica con la
+      publica (antes ambas operaciones usaban el mismo secreto).
+
+  [x] Nuevo endpoint: GET /.well-known/jwks.json (formato estandar
+      JWKS, RFC 7517) -- publica la clave publica para que cualquier
+      servicio la consuma. No se agrego ninguna dependencia nueva
+      (la libreria "cryptography" ya venia con pyjwt[crypto]).
+
+  [x] Tests: se genera un par de claves RSA DESECHABLE en memoria para
+      cada corrida de tests (nunca un PEM fijo commiteado, eso lo
+      marcaria un secret-scanner de Github). Extraido a un helper
+      compartido: tests/rsa_test_keys.py (evita duplicar codigo entre
+      tests/unit/conftest.py y tests/integration/conftest.py).
+
+  [x] docker-compose.yml: la carpeta keys/ se monta como volumen de
+      solo lectura en el servicio "app" (nunca se hornea en la imagen
+      Docker -- ver .dockerignore). Rotar la clave = reemplazar el
+      archivo en el host, no reconstruir la imagen.
+
+  [x] Verificado en vivo con docker compose: JWKS responde correctamente,
+      el flujo completo de auth sigue funcionando, y se probo que un
+      CLIENTE EXTERNO (usando PyJWT's PyJWKClient, exactamente como lo
+      hara Inventory Service) puede verificar un token consultando SOLO
+      el endpoint JWKS, sin conocer jamas la clave privada.
+
+  [x] README.md actualizado (seccion Security, tabla de endpoints,
+      variables de entorno, instrucciones de instalacion).
+
+--------------------------------------------------------------------
 UBICACION DEL PROYECTO
 --------------------------------------------------------------------
   /Users/sergiomorillo/Desktop/auth-service

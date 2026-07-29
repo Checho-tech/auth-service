@@ -1,8 +1,17 @@
-"""JWT encode/decode using PyJWT.
+"""JWT encode/decode using PyJWT, signed with RS256 (asymmetric keys).
 
 Two token types share this module but are never interchangeable:
   - "access"  -> short-lived, sent on every request, never stored server-side.
   - "refresh" -> long-lived, stored (hashed) in `refresh_tokens` so it can be revoked.
+
+Tokens are signed with the PRIVATE key and verified with the PUBLIC key —
+deliberately not the same secret for both directions. This service is meant
+to be consumed by other, separately-deployed microservices (Project 2:
+Inventory Service); with a single shared HS256 secret, every consumer would
+need a copy of the exact same string, and any one of them leaking it would
+let an attacker forge tokens. With RS256, the public key (exposed at
+GET /.well-known/jwks.json) can be handed to any number of consumers freely
+— it can only verify, never sign.
 
 Every function takes `settings` as an explicit parameter rather than calling
 the global `get_settings()` itself. That's what makes AuthService's unit
@@ -46,7 +55,10 @@ def _create_token(
         "jti": str(uuid.uuid4()),
         **(extra_claims or {}),
     }
-    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    headers = {"kid": settings.jwt_key_id}
+    return jwt.encode(
+        payload, settings.jwt_private_key, algorithm=settings.jwt_algorithm, headers=headers
+    )
 
 
 def create_access_token(settings: Settings, user_id: UUID, role_names: tuple[str, ...]) -> str:
@@ -74,7 +86,7 @@ def create_email_verification_token(settings: Settings, user_id: UUID) -> str:
 
 def decode_token(settings: Settings, token: str, expected_type: TokenType) -> dict[str, Any]:
     try:
-        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+        payload = jwt.decode(token, settings.jwt_public_key, algorithms=[settings.jwt_algorithm])
     except jwt.ExpiredSignatureError as exc:
         raise InvalidTokenError("Token has expired.") from exc
     except jwt.InvalidTokenError as exc:

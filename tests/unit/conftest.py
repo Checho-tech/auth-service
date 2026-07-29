@@ -3,6 +3,7 @@ import pytest
 from auth_service.application.services.auth_service import AuthService
 from auth_service.application.services.user_management_service import UserManagementService
 from auth_service.infrastructure.config import Settings
+from tests.rsa_test_keys import generate_test_keypair
 from tests.unit.fakes import (
     FakeAuditLogRepository,
     FakeEmailSender,
@@ -11,12 +12,15 @@ from tests.unit.fakes import (
     FakeUserRepository,
 )
 
+_TEST_PRIVATE_KEY_PATH, _TEST_PUBLIC_KEY_PATH = generate_test_keypair()
+
 # Built directly, NOT via get_settings(): unit tests never touch the
 # process-wide lru_cache, so they can't leak configuration into (or from)
 # the integration test suite, which relies on that same cache being fresh.
 TEST_SETTINGS = Settings(
     database_url="postgresql+asyncpg://unused:unused@localhost/unused",
-    jwt_secret_key="unit-test-secret-key-not-used-in-prod-32chars",
+    jwt_private_key_path=_TEST_PRIVATE_KEY_PATH,
+    jwt_public_key_path=_TEST_PUBLIC_KEY_PATH,
     max_failed_login_attempts=3,
     account_lock_duration_minutes=15,
 )
